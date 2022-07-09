@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-use std::hash::Hash;
 use std::io::Read;
 use std::net::{TcpListener, TcpStream};
-use serde_json::Value;
+use httparse::Header;
 
 fn main() {
     let listener = TcpListener::bind("0.0.0.0:8765").unwrap();
@@ -16,65 +14,36 @@ fn main() {
 }
 
 fn handle_conn(mut stream: TcpStream) {
-    let mut buffer = [0; 1024];
-    stream.read(&mut buffer).unwrap();
+    let mut buffer = [0; 1024*64]; // 64kb
+    let actual_size = stream.read(&mut buffer).unwrap();
 
-    //println!("{}", String::from_utf8_lossy(&buffer));
+    let mut headers = [httparse::EMPTY_HEADER; 16];
+    let mut req = httparse::Request::new(&mut headers);
+    req.parse(&buffer).unwrap();
 
-    let data: HashMap<String, Value> = serde_json::from_slice(parse_data(&buffer)).expect("");
-    let headers: HashMap<String, String> = parse_headers(&buffer);
-
-    for (key, value) in data {
-        println!("{} : {}", key, value);
-    }
-
-
-}
-
-fn parse_data(buffer: &[u8]) -> &[u8] {
-    let mut start: usize = 0;
-    let mut end: usize = 0;
-    let mut index: usize = 0;
-    let mut count: usize = 0;
-    for i in buffer { // Parse out the json from the request
-        if *i == '{' as u8 {
-            count += 1;
-            if start == 0 {
-                start = index;
-            }
-        } else if *i == '}' as u8 {
-            count -= 1;
-            if count == 0 {
-                end = index;
-                break;
-            }
-        };
-        index += 1;
-    }
-    start -= 1; // Include the json braces
-    end += 1;
-
-    &buffer[start..end]
-}
-
-fn parse_headers(buffer: &[u8]) -> HashMap<String, String> {
-    // Parses the headers from the request,
-    // If there is an error, throw out the request.
-
-    let mut headers: HashMap<String, String> = HashMap::new();
-
-    let mut i: usize = 0;
-    while i < buffer.len() {
-
-        if buffer[i] == 0x0A  { // 0x0A is newline
-            if buffer[i+1] == 0x0A {
-                println!("{}", i);
-                println!("{}", String::from_utf8_lossy(&buffer[0..i]));
-                break;
+    if !headers.is_empty() {
+        for header in headers {
+            match header {
+                Header { name: "X-GitHub-Event", .. } => {
+                    println!("{} : {}", header.name, String::from_utf8_lossy(header.value));
+                }
+                Header { name: "X-GitHub-Delivery", .. } => {
+                    println!("{} : {}", header.name, String::from_utf8_lossy(header.value));
+                }
+                Header { name: "X-Hub-Signature-256", .. } => {
+                    println!("{} : {}", header.name, String::from_utf8_lossy(header.value));
+                    let mut start_of_body: usize = 0;
+                    while start_of_body < buffer.len() {
+                        // TODO Make more robust check using carriage returns and line breaks.
+                        if buffer[start_of_body] == '{' as u8 { break;} else { start_of_body += 1;}
+                    }
+                    let body = &buffer[start_of_body..actual_size];
+                    println!("{}", String::from_utf8_lossy(&body));
+                }
+                _ => {}
             }
         }
-        i += 1;
     }
 
-    headers
+
 }
