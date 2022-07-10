@@ -1,0 +1,48 @@
+name: Package Debian
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - name: Deb Build
+        uses: update/cargo-deb-amd64-ubuntu@1.0es
+      - name: Upload Deb Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: amd64deb
+          path: ./target/x86_64-unknown-linux-musl/debian/*
+  update_release_draft:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        with:
+          tag_name: '${{ needs.quickcheck.outputs.version }}'
+          release_name: Release ${{ needs.quickcheck.outputs.version }}
+          body: 'Change Me'
+          draft: true
+          prerelease: false
+      - uses: actions/download-artifact@v2
+      - run: ls -lha
+      - name: Upload amd64 deb Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./amd64deb/ebbflow_${{needs.quickcheck.outputs.version}}_amd64.deb
+          asset_name: 'ebbflow_${{needs.quickcheck.outputs.version}}_amd64.deb'
+          asset_content_type: application/vnd.debian.binary-package
