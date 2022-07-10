@@ -1,6 +1,13 @@
 use std::io::Read;
 use std::net::{TcpListener, TcpStream};
+use hex_literal::hex;
+use hmac::{Hmac, Mac};
 use httparse::Header;
+use serde_json::Value;
+use sha2::Sha256;
+use hex::encode;
+
+type HmacSha256 = Hmac<Sha256>;
 
 fn main() {
     let listener = TcpListener::bind("0.0.0.0:8765").unwrap();
@@ -38,12 +45,20 @@ fn handle_conn(mut stream: TcpStream) {
                         if buffer[start_of_body] == '{' as u8 { break;} else { start_of_body += 1;}
                     }
                     let body = &buffer[start_of_body..actual_size];
-                    println!("{}", String::from_utf8_lossy(&body));
+                    let body_json: Value = serde_json::from_slice(&body).expect("Cannot Parse JSON");
+                    println!("Body: {} \n", String::from_utf8_lossy(&body));
+
+                    let key = "password";
+                    let mut mac = HmacSha256::new_from_slice(key.as_bytes()).expect("");
+                    mac.update(body);
+
+                    if String::from_utf8_lossy(&header.value[7..]) != encode(mac.finalize().into_bytes()) {
+                        return
+                    }
                 }
                 _ => {}
             }
         }
     }
-
-
 }
+
