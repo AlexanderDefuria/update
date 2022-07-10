@@ -1,6 +1,5 @@
 use std::io::Read;
 use std::net::{TcpListener, TcpStream};
-use hex_literal::hex;
 use hmac::{Hmac, Mac};
 use httparse::Header;
 use serde_json::Value;
