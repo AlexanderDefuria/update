@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - name: Deb Build
-        uses: update/cargo-deb-amd64-ubuntu@1.0es
+        uses: ebbflow-io/cargo-deb-amd64-ubuntu@1.0
       - name: Upload Deb Artifact
         uses: actions/upload-artifact@v2
         with:
