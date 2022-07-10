@@ -9,17 +9,20 @@ on:
 
 jobs:
   build:
+    needs: [build]
     runs-on: ubuntu-latest
+    name: Amd64Deb
     steps:
-      - uses: actions/checkout@master
-      - name: Deb Build
+      - uses: actions/checkout@v2
+      - name: BuildDeb
+        id: build
         uses: ebbflow-io/cargo-deb-amd64-ubuntu@1.0
       - name: Upload Deb Artifact
         uses: actions/upload-artifact@v2
         with:
           name: amd64deb
           path: ./target/x86_64-unknown-linux-musl/debian/*
-  update_release_draft:
+  release:
     needs: build
     runs-on: ubuntu-latest
     steps:
